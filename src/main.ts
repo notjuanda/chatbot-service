@@ -1,8 +1,23 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  await app.listen(process.env.PORT ?? 3000);
+  app.enableCors();
+
+  // Configuración de Swagger
+  const config = new DocumentBuilder()
+    .setTitle('Chatbot Gluten Free Home')
+    .setDescription('API para interactuar con el chatbot de productos sin gluten (DeepSeek)')
+    .setVersion('1.0')
+    .addTag('chat')
+    .build();
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api', app, document);
+
+  await app.listen(process.env.PORT || 3000);
+  console.log(`🚀 Chatbot API corriendo en http://localhost:${process.env.PORT || 3000}/chat`);
+  console.log(`📚 Swagger en http://localhost:${process.env.PORT || 3000}/api`);
 }
 bootstrap();
