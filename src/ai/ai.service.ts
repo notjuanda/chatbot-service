@@ -1,17 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import OpenAI from 'openai';
 import { IAiService, ChatMessage } from '../common/interfaces/chat.interface';
 
 @Injectable()
 export class AiService implements IAiService {
-  private openai: OpenAI;
+  private geminiApiKey: string;
+  private geminiModel: string;
+  private geminiApiUrl: string;
 
   constructor(private configService: ConfigService) {
-    this.openai = new OpenAI({
-      baseURL: 'http://localhost:11434/v1', // Ollama API local
-      apiKey: 'ollama', // cualquier string, no se valida
-    });
+    this.geminiApiKey = this.configService.get<string>('GEMINI_API_KEY') || '';
+    this.geminiModel = this.configService.get<string>('GEMINI_MODEL') || 'gemini-1.5-flash-latest';
+    this.geminiApiUrl = this.configService.get<string>('GEMINI_API_URL') || 'https://generativelanguage.googleapis.com/v1beta/models';
   }
 
   async generateResponse(
@@ -19,19 +19,40 @@ export class AiService implements IAiService {
     context?: string,
     conversationHistory?: ChatMessage[]
   ): Promise<string> {
-    let prompt = this.buildPrompt(message, context, conversationHistory);
+    const prompt = this.buildPrompt(message, context, conversationHistory);
+    const url = `${this.geminiApiUrl}/${this.geminiModel}:generateContent?key=${this.geminiApiKey}`;
 
-    const completion = await this.openai.chat.completions.create({
-      model: 'llama3', // modelo local de Ollama
-      messages: [
-        { role: 'system', content: prompt },
-        { role: 'user', content: message }
-      ],
-      max_tokens: 400,
-      temperature: 0.3, // Muy bajo para respuestas más consistentes
-    });
-    
-    return completion.choices[0]?.message?.content || 'Lo siento, no pude generar una respuesta.';
+    const body = {
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { text: prompt }
+          ]
+        }
+      ]
+    };
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) {
+        throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
+      }
+      const data = await response.json();
+      // Gemini responde con choices[0].message.content o candidates[0].content.parts[0].text
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ||
+                   data?.choices?.[0]?.message?.content ||
+                   'Lo siento, no pude generar una respuesta.';
+      return text;
+    } catch (error) {
+      return 'Lo siento, no pude generar una respuesta en este momento.';
+    }
   }
 
   private buildPrompt(

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { IChatService, ChatResponse } from '../common/interfaces/chat.interface';
-import { SessionService } from './session.service';
+import { RedisSessionService } from './redis-session.service';
 import { ContextService } from './context.service';
 import { ProductsService } from '../products/products.service';
 import { AiService } from '../ai/ai.service';
@@ -9,7 +9,7 @@ import { WhatsAppService } from '../common/services/whatsapp.service';
 @Injectable()
 export class ChatService implements IChatService {
   constructor(
-    private readonly sessionService: SessionService,
+    private readonly sessionService: RedisSessionService,
     private readonly contextService: ContextService,
     private readonly productsService: ProductsService,
     private readonly aiService: AiService,
@@ -22,6 +22,15 @@ export class ChatService implements IChatService {
     
     // 2. Guardar mensaje del usuario
     await this.sessionService.saveMessage(sessionId, message, 'user');
+
+    // --- NUEVO: Detección de reclamos/problemas ---
+    if (this.isComplaint(message)) {
+      const whatsappLink = this.whatsappService.generateWhatsAppLink();
+      const respuesta = `Lamento mucho el inconveniente. Por favor, contacta a nuestro equipo de soporte por WhatsApp para que podamos ayudarte: ${whatsappLink}`;
+      await this.sessionService.saveMessage(sessionId, respuesta, 'assistant');
+      return { response: respuesta, productos: [] };
+    }
+    // --- FIN NUEVO ---
 
     // 3. Obtener productos relevantes basándose en el mensaje
     const { productos, whatsappLink } = await this.getRelevantProducts(message);
@@ -163,4 +172,18 @@ export class ChatService implements IChatService {
       return `¡Ups! Hubo un problema técnico y no puedo responder en este momento. Por favor, contacta a nuestro equipo humano por WhatsApp: ${whatsappLink}`;
   }
 }
+
+  // --- NUEVO: Método para detectar reclamos/problemas ---
+  private isComplaint(message: string): boolean {
+    const complaintKeywords = [
+      'problema', 'reclamo', 'queja', 'fallo', 'error', 'no llegó', 'no llego', 'llegó mal', 'llego mal',
+      'dañado', 'roto', 'malo', 'defectuoso', 'incorrecto', 'equivocado', 'no funciona', 'no sirve',
+      'me llegó', 'me llego', 'me enviaron', 'me mandaron', 'pedido mal', 'pedido equivocado',
+      'no recibí', 'no recibi', 'faltó', 'falto', 'faltan', 'faltaron', 'no está', 'no esta',
+      'no corresponde', 'no era', 'no es lo que', 'no coincide', 'no corresponde', 'reembolso', 'devolución', 'devolucion',
+      'cancelar', 'cancelación', 'cancelacion', 'soporte', 'ayuda', 'atención', 'atencion', 'servicio al cliente'
+    ];
+    const lower = message.toLowerCase();
+    return complaintKeywords.some(keyword => lower.includes(keyword));
+  }
 } 

@@ -16,7 +16,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/user.decorator';
 import { UsersService } from '../users/users.service';
 import { RateLimitService } from '../common/services/rate-limit.service';
-import { SessionService } from './session.service';
+import { RedisSessionService } from './redis-session.service';
 import { Request } from 'express';
 
 @ApiTags('chat')
@@ -26,7 +26,7 @@ export class ChatController {
     private readonly chatService: ChatService,
     private readonly usersService: UsersService,
     private readonly rateLimitService: RateLimitService,
-    private readonly sessionService: SessionService,
+    private readonly sessionService: RedisSessionService,
   ) {}
 
   @Post()
