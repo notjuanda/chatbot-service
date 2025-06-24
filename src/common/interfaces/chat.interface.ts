@@ -1,6 +1,7 @@
 export interface ChatResponse {
     response: string;
     productos: ProductDto[];
+    remainingRequests?: number;
 }
 
 export interface ProductDto {
@@ -10,6 +11,7 @@ export interface ProductDto {
     price?: number;
     stock?: number;
     brand?: string;
+    category?: string;
     ingredients?: string[];
 }
 

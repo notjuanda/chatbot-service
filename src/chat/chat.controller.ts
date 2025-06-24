@@ -1,44 +1,155 @@
-import { Controller, Post, Body } from '@nestjs/common';
-import { ApiBody, ApiOperation, ApiResponse, ApiTags, ApiProperty } from '@nestjs/swagger';
+import { 
+  Controller, 
+  Post, 
+  Delete,
+  Body, 
+  Req, 
+  UseGuards, 
+  HttpException, 
+  HttpStatus,
+  Ip 
+} from '@nestjs/common';
+import { ApiBody, ApiOperation, ApiResponse, ApiTags, ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
 import { ChatService } from './chat.service';
-
-class ChatRequestDto {
-  @ApiProperty({ example: 'user123', description: 'Identificador único del usuario o sesión.' })
-  userId: string;
-
-  @ApiProperty({ example: '¿Qué productos sin gluten tienen?', description: 'Mensaje enviado por el usuario al chatbot.' })
-  message: string;
-}
-
-class ChatResponseDto {
-  @ApiProperty({ example: '¡Hola! Tenemos pan, galletas y más productos sin gluten.', description: 'Respuesta generada por el chatbot.' })
-  response: string;
-}
+import { ChatMessageDto, ChatResponseDto } from './dto/chat-message.dto';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { CurrentUser } from '../common/decorators/user.decorator';
+import { UsersService } from '../users/users.service';
+import { RateLimitService } from '../common/services/rate-limit.service';
+import { SessionService } from './session.service';
+import { Request } from 'express';
 
 @ApiTags('chat')
 @Controller('chat')
 export class ChatController {
-  constructor(private readonly chatService: ChatService) {}
+  constructor(
+    private readonly chatService: ChatService,
+    private readonly usersService: UsersService,
+    private readonly rateLimitService: RateLimitService,
+    private readonly sessionService: SessionService,
+  ) {}
 
   @Post()
-  @ApiOperation({ summary: 'Enviar mensaje al chatbot', description: 'Envía un mensaje y recibe una respuesta generada por IA, con contexto real de productos.' })
-  @ApiBody({ type: ChatRequestDto, examples: {
-    ejemplo1: {
-      summary: 'Consulta de productos',
-      value: { userId: 'user123', message: '¿Qué productos sin gluten tienen?' }
-    },
-    ejemplo2: {
-      summary: 'Consulta de stock',
-      value: { userId: 'user456', message: '¿Tienen pan sin gluten disponible?' }
+  @ApiOperation({ 
+    summary: 'Enviar mensaje al chatbot', 
+    description: 'Envía un mensaje y recibe una respuesta generada por IA. Requiere autenticación JWT o está limitado por IP para usuarios no autenticados.' 
+  })
+  @ApiBody({ 
+    type: ChatMessageDto, 
+    examples: {
+      usuarioAutenticado: {
+        summary: 'Usuario autenticado',
+        value: { message: '¿Qué productos sin gluten tienen?' }
+      },
+      usuarioNoAutenticado: {
+        summary: 'Usuario no autenticado (limitado por IP)',
+        value: { message: '¿Tienen pan sin gluten?' }
+      }
     }
-  }})
-  @ApiResponse({ status: 200, description: 'Respuesta generada por el chatbot', type: ChatResponseDto, examples: {
-    ejemplo1: {
-      summary: 'Respuesta con productos',
-      value: { response: '¡Hola! Tenemos pan, galletas y más productos sin gluten.' }
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Respuesta generada por el chatbot', 
+    type: ChatResponseDto 
+  })
+  @ApiResponse({ 
+    status: 401, 
+    description: 'Usuario no autenticado o token inválido' 
+  })
+  @ApiResponse({ 
+    status: 403, 
+    description: 'Usuario no tiene permisos de cliente o excedió límite de rate' 
+  })
+  @ApiResponse({ 
+    status: 429, 
+    description: 'Demasiadas solicitudes (rate limit excedido)' 
+  })
+  async chat(
+    @Body() body: ChatMessageDto,
+    @Req() req: Request,
+    @Ip() ip: string,
+    @CurrentUser() user?: any
+  ): Promise<ChatResponseDto> {
+    let userId: string;
+    let isAuthenticated = false;
+
+    // Verificar si el usuario está autenticado
+    if (user && user.id) {
+      // Usuario autenticado - validar que sea un cliente
+      const validatedUser = await this.usersService.validateUser(user.id);
+      if (!validatedUser) {
+        throw new HttpException(
+          'Usuario no tiene permisos de cliente', 
+          HttpStatus.FORBIDDEN
+        );
+      }
+      
+      userId = `user_${user.id}`;
+      isAuthenticated = true;
+    } else {
+      // Usuario no autenticado - aplicar rate limiting por IP
+      if (!this.rateLimitService.isAllowed(ip)) {
+        const resetTime = this.rateLimitService.getResetTime(ip);
+        throw new HttpException(
+          {
+            message: 'Has excedido el límite de mensajes. Intenta de nuevo más tarde.',
+            resetTime: resetTime?.toISOString(),
+          },
+          HttpStatus.TOO_MANY_REQUESTS
+        );
+      }
+      
+      userId = `ip_${ip}`;
     }
-  }})
-  async chat(@Body() body: ChatRequestDto): Promise<ChatResponseDto> {
-    return this.chatService.chat(body.userId, body.message);
+
+    // Procesar el mensaje
+    const result = await this.chatService.chat(userId, body.message);
+    
+    // Agregar información de rate limiting para usuarios no autenticados
+    if (!isAuthenticated) {
+      result.remainingRequests = this.rateLimitService.getRemainingRequests(ip);
+    }
+
+    return result;
+  }
+
+  @Delete('session')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ 
+    summary: 'Limpiar sesión del chatbot', 
+    description: 'Elimina la sesión del chatbot para el usuario autenticado' 
+  })
+  @ApiResponse({ status: 200, description: 'Sesión eliminada correctamente' })
+  async clearSession(@CurrentUser() user: any): Promise<{ message: string }> {
+    const userId = `user_${user.id}`;
+    await this.sessionService.clearSession(userId);
+    return { message: 'Sesión del chatbot eliminada correctamente' };
+  }
+
+  @Post('authenticated')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ 
+    summary: 'Enviar mensaje al chatbot (solo usuarios autenticados)', 
+    description: 'Endpoint específico para usuarios autenticados con JWT' 
+  })
+  @ApiBody({ type: ChatMessageDto })
+  @ApiResponse({ status: 200, description: 'Respuesta generada por el chatbot', type: ChatResponseDto })
+  async chatAuthenticated(
+    @Body() body: ChatMessageDto,
+    @CurrentUser() user: any
+  ): Promise<ChatResponseDto> {
+    // Validar que el usuario sea un cliente
+    const validatedUser = await this.usersService.validateUser(user.id);
+    if (!validatedUser) {
+      throw new HttpException(
+        'Usuario no tiene permisos de cliente', 
+        HttpStatus.FORBIDDEN
+      );
+    }
+
+    const userId = `user_${user.id}`;
+    return this.chatService.chat(userId, body.message);
   }
 } 

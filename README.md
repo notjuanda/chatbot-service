@@ -1,98 +1,226 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Chatbot Service - Gluten Free Home
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Servicio de chatbot inteligente para Gluten Free Home, integrado con llama3 de Ollama y conectado a la base de datos principal del e-commerce.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Características
 
-## Description
+- 🤖 **IA Inteligente**: Integración con llama3 de Ollama para respuestas contextuales
+- 🔐 **Autenticación JWT**: Validación de usuarios autenticados contra la base de datos principal
+- 🛡️ **Rate Limiting**: Protección contra abusos para usuarios no autenticados (10 mensajes/hora por IP)
+- 📊 **Contexto de Productos**: Acceso a productos reales de la base de datos
+- 💬 **Historial de Conversación**: Mantiene contexto de conversaciones por sesión
+- 📱 **Escalación a WhatsApp**: Redirección automática para consultas complejas
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Configuración
 
-## Project setup
+### 1. Variables de Entorno
+
+Copia el archivo `env.example` a `.env` y configura las variables:
 
 ```bash
-$ yarn install
+# Configuración del servidor
+NODE_ENV=development
+PORT=3001
+
+# Base de datos del chatbot
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=postgres
+DB_PASS=password
+DB_NAME=chatbot_db
+
+# Base de datos principal de GFHome
+MAIN_DB_HOST=localhost
+MAIN_DB_PORT=5432
+MAIN_DB_USER=postgres
+MAIN_DB_PASS=password
+MAIN_DB_NAME=gfhome
+
+# JWT Secret (debe ser el mismo que en el proyecto principal)
+JWT_SECRET=tu_jwt_secret_super_seguro_aqui
+
+# WhatsApp (opcional)
+WHATSAPP_PHONE=+1234567890
+WHATSAPP_MESSAGE=Hola, necesito ayuda con mi pedido
 ```
 
-## Compile and run the project
+### 2. Instalación
 
 ```bash
-# development
-$ yarn run start
-
-# watch mode
-$ yarn run start:dev
-
-# production mode
-$ yarn run start:prod
+yarn install
 ```
 
-## Run tests
+### 3. Ollama Setup
 
 ```bash
-# unit tests
-$ yarn run test
+# Instalar Ollama (si no lo tienes)
+# https://ollama.ai/
 
-# e2e tests
-$ yarn run test:e2e
+# Descargar y ejecutar llama3
+ollama pull llama3
+ollama run llama3
 
-# test coverage
-$ yarn run test:cov
+# Verificar que Ollama esté corriendo en http://localhost:11434
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### 4. Base de Datos
 
 ```bash
-$ yarn install -g @nestjs/mau
-$ mau deploy
+# Crear base de datos del chatbot
+createdb chatbot_db
+
+# Ejecutar migraciones (si las hay)
+yarn run migration:run
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+### 5. Ejecutar
 
-## Resources
+```bash
+# Desarrollo
+yarn run start:dev
 
-Check out a few resources that may come in handy when working with NestJS:
+# Producción
+yarn run start:prod
+```
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+## API Endpoints
 
-## Support
+### POST /chat
+Endpoint principal para enviar mensajes al chatbot.
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+**Usuarios Autenticados:**
+- Requiere header `Authorization: Bearer <jwt_token>`
+- Sin límite de mensajes
+- Acceso completo a funcionalidades
 
-## Stay in touch
+**Usuarios No Autenticados:**
+- Limitado a 10 mensajes por hora por IP
+- Funcionalidad básica
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+**Ejemplo de Request:**
+```json
+{
+  "message": "¿Qué productos sin gluten tienen?"
+}
+```
 
-## License
+**Ejemplo de Response:**
+```json
+{
+  "response": "¡Hola! Tenemos varios productos sin gluten...",
+  "productos": [
+    {
+      "id": 1,
+      "name": "Pan sin gluten",
+      "price": 5.99
+    }
+  ],
+  "remainingRequests": 9
+}
+```
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+### POST /chat/authenticated
+Endpoint específico para usuarios autenticados (requiere JWT).
+
+## Autenticación
+
+El servicio valida usuarios contra la base de datos principal de GFHome:
+
+1. **Verificación JWT**: Valida el token contra el secret configurado
+2. **Validación de Usuario**: Verifica que el usuario existe en la base de datos
+3. **Verificación de Roles**: Confirma que el usuario tiene rol de "cliente"
+4. **Rate Limiting**: Solo aplica a usuarios no autenticados
+
+## Rate Limiting
+
+- **Usuarios Autenticados**: Sin límite
+- **Usuarios No Autenticados**: 10 mensajes por hora por IP
+- **Headers de Respuesta**: Incluye `remainingRequests` y `resetTime`
+
+## Integración con Frontend
+
+### Usuarios Autenticados
+```javascript
+const response = await fetch('/chat', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  },
+  body: JSON.stringify({
+    message: '¿Qué productos tienen?'
+  })
+});
+```
+
+### Usuarios No Autenticados
+```javascript
+const response = await fetch('/chat', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    message: '¿Qué productos tienen?'
+  })
+});
+```
+
+## Estructura del Proyecto
+
+```
+src/
+├── chat/                 # Módulo principal del chatbot
+│   ├── chat.controller.ts
+│   ├── chat.service.ts
+│   ├── entities/         # Entidades de la base de datos
+│   └── dto/             # Data Transfer Objects
+├── users/               # Validación de usuarios
+├── ai/                  # Integración con llama3 + Ollama
+├── products/            # Acceso a productos
+├── common/              # Servicios compartidos
+│   ├── guards/          # Guards de autenticación
+│   ├── services/        # Rate limiting, WhatsApp
+│   └── jwt/            # Configuración JWT
+└── config/             # Configuración de base de datos
+```
+
+## Desarrollo
+
+### Comandos Útiles
+
+```bash
+# Ejecutar tests
+yarn run test
+
+# Ejecutar tests e2e
+yarn run test:e2e
+
+# Generar documentación Swagger
+# Disponible en: http://localhost:3001/api
+```
+
+### Logs
+
+El servicio registra:
+- Validaciones de usuarios
+- Rate limiting
+- Errores de IA
+- Conexiones a base de datos
+
+## Seguridad
+
+- ✅ Validación de JWT tokens
+- ✅ Verificación de roles de usuario
+- ✅ Rate limiting por IP
+- ✅ Conexiones seguras a base de datos
+- ✅ Sanitización de inputs
+
+## Soporte
+
+Para problemas o preguntas:
+1. Revisar logs del servicio
+2. Verificar configuración de variables de entorno
+3. Confirmar conectividad con bases de datos
+4. Validar JWT secret con el proyecto principal
+5. Verificar que Ollama esté corriendo y el modelo llama3 esté disponible

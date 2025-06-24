@@ -1,44 +1,28 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { Product, Brand, Ingredient } from '../database/product.entity';
+import { ConfigService } from '@nestjs/config';
+import { getDatabaseConfig, getMainDatabaseConfig } from '../config/database.config';
+import { ChatSession } from '../chat/entities/chat-session.entity';
+import { ChatMessage } from '../chat/entities/chat-message.entity';
+import { Product, Brand, Ingredient, ProductCategory } from './product.entity';
 
 @Module({
   imports: [
-    ConfigModule,
-    // Conexión por defecto: para entidades del chatbot
+    // Base de datos del chatbot
     TypeOrmModule.forRootAsync({
-      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => getDatabaseConfig(configService),
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        type: 'postgres',
-        host: config.get('CHATBOT_DB_HOST', 'localhost'),
-        port: parseInt(config.get('CHATBOT_DB_PORT', '5432')),
-        username: config.get('CHATBOT_DB_USERNAME', 'postgres'),
-        password: config.get('CHATBOT_DB_PASSWORD', 'password'),
-        database: config.get('CHATBOT_DB_NAME', 'chatbot_db'),
-        autoLoadEntities: true,
-        synchronize: true, // Solo para desarrollo
-      }),
     }),
-    // Segunda conexión: para productos, ingredientes, marcas, etc.
+    // Base de datos principal de GFHome
     TypeOrmModule.forRootAsync({
-      name: 'PRODUCTS_DB',
-      imports: [ConfigModule],
+      name: 'main-database',
+      useFactory: (configService: ConfigService) => getMainDatabaseConfig(configService),
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        type: 'postgres',
-        host: config.get('GFHOME_DB_HOST', 'localhost'),
-        port: parseInt(config.get('GFHOME_DB_PORT', '5432')),
-        username: config.get('GFHOME_DB_USERNAME', 'postgres'),
-        password: config.get('GFHOME_DB_PASSWORD', 'password'),
-        database: config.get('GFHOME_DB_NAME', 'gfhome'),
-        autoLoadEntities: false, // Se registran manualmente las entidades
-        synchronize: false, // Nunca sincronizar la base real
-        entities: [Product, Brand, Ingredient],
-      }),
     }),
-    TypeOrmModule.forFeature([Product, Brand, Ingredient], 'PRODUCTS_DB'),
+    // Entidades del chatbot
+    TypeOrmModule.forFeature([ChatSession, ChatMessage]),
+    // Entidades de productos en la base de datos principal
+    TypeOrmModule.forFeature([Product, Brand, Ingredient, ProductCategory], 'main-database'),
   ],
   exports: [TypeOrmModule],
 })

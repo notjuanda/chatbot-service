@@ -10,6 +10,24 @@ export class Brand {
   nombre: string;
 }
 
+@Entity({ name: 'product_categories' })
+export class ProductCategory {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @Column({ unique: true })
+  nombre: string;
+
+  @Column({ unique: true })
+  slug: string;
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
+}
+
 @Entity({ name: 'ingredients' })
 export class Ingredient {
   @PrimaryGeneratedColumn()
@@ -38,6 +56,9 @@ export class Product {
     onDelete: 'SET NULL',
   })
   marca?: Brand;
+
+  @ManyToOne(() => ProductCategory)
+  categoria: ProductCategory;
 
   @Column('decimal', { precision: 10, scale: 2 })
   precioBob: number;
